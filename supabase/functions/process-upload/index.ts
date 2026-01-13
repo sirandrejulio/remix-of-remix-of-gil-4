@@ -322,12 +322,6 @@ serve(async (req) => {
 
     console.log(`Processing upload: ${fileName} (${type || 'unknown'}) - ID: ${fileId}`);
 
-    // Mark file as being processed
-    await supabase
-      .from('arquivos_importados')
-      .update({ status: 'processando' })
-      .eq('id', fileId);
-
     let questoesExtraidas = 0;
     let engineUsed = 'none';
     let wasCached = false;
@@ -403,15 +397,6 @@ serve(async (req) => {
       const temasDetectados = [...new Set(extractedQuestions.map(q => q.tema).filter(Boolean))];
       console.log(`Detected themes: ${temasDetectados.join(', ')}`);
     }
-
-    // Mark as processed and update question count
-    await supabase
-      .from('arquivos_importados')
-      .update({ 
-        status: 'processado',
-        questoes_extraidas: questoesExtraidas
-      })
-      .eq('id', fileId);
 
     console.log(`Successfully processed: ${fileName} - ${questoesExtraidas} questions extracted using ${engineUsed} (cached: ${wasCached})`);
 
