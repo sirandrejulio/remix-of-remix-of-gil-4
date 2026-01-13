@@ -185,7 +185,7 @@ export default function AdminQuestoes() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [questoesResult, disciplinasResult] = await Promise.all([
+      const [questoesResult, disciplinasResult, textosBaseResult] = await Promise.all([
         supabase.from('questoes').select(`
           *,
           textos_base(id, titulo, conteudo, fonte, autor)
@@ -201,7 +201,7 @@ export default function AdminQuestoes() {
 
       setQuestoes(processedQuestoes);
       setDisciplinas(disciplinasResult.data || []);
-      setTextosBaseList((textosBaseResult.data as any) || []);
+      setTextosBaseList((textosBaseResult.data as TextoBase[]) || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erro ao carregar dados');
@@ -361,7 +361,6 @@ export default function AdminQuestoes() {
           imagem_url: editForm.imagem_url,
           status_validacao: editForm.status_validacao,
           motivo_validacao: editForm.motivo_validacao,
-          banca: editForm.banca,
           banca: editForm.banca,
           ano_referencia: editForm.ano_referencia,
           texto_base_id: editForm.texto_base_id,
