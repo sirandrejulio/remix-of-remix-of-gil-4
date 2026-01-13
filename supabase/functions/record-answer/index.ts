@@ -103,7 +103,7 @@ serve(async (req) => {
       await supabase
         .from('respostas')
         .update({
-          resposta_usuario: resposta,
+          resposta_selecionada: resposta,
           esta_correta: estaCorreta,
         })
         .eq('id', existingResposta.id);
@@ -114,7 +114,7 @@ serve(async (req) => {
         .insert({
           simulado_id,
           questao_id,
-          resposta_usuario: resposta,
+          resposta_selecionada: resposta,
           esta_correta: estaCorreta,
           user_id: userId,
         });

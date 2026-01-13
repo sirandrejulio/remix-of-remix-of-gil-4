@@ -963,7 +963,6 @@ export type Database = {
           id: string
           questao_id: string | null
           resposta_selecionada: string
-          resposta_usuario: string | null
           simulado_id: string | null
           tempo_resposta: number | null
           tempo_resposta_segundos: number | null
@@ -975,7 +974,6 @@ export type Database = {
           id?: string
           questao_id?: string | null
           resposta_selecionada: string
-          resposta_usuario?: string | null
           simulado_id?: string | null
           tempo_resposta?: number | null
           tempo_resposta_segundos?: number | null
@@ -987,7 +985,6 @@ export type Database = {
           id?: string
           questao_id?: string | null
           resposta_selecionada?: string
-          resposta_usuario?: string | null
           simulado_id?: string | null
           tempo_resposta?: number | null
           tempo_resposta_segundos?: number | null
