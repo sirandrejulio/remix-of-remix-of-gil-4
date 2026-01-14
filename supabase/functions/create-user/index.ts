@@ -23,6 +23,10 @@ const createUserSchema = z.object({
     .min(2, "Nome muito curto")
     .max(100, "Nome muito longo")
     .transform(val => val.trim()),
+  telefone: z.string()
+    .min(10, "Telefone deve ter no mínimo 10 dígitos")
+    .max(15, "Telefone muito longo")
+    .regex(/^\d+$/, "Telefone deve conter apenas números"),
   role: z.enum(["admin", "moderator", "user"]).optional().default("user"),
 });
 
@@ -96,7 +100,7 @@ serve(async (req) => {
       });
     }
 
-    const { email, password, nome, role } = parseResult.data;
+    const { email, password, nome, telefone, role } = parseResult.data;
 
     // Check if user already exists
     const { data: existingProfile } = await supabaseAdmin
@@ -137,6 +141,7 @@ serve(async (req) => {
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         nome,
+        telefone,
         invite_role: role,
       },
     });

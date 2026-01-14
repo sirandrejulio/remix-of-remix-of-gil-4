@@ -20,7 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   isRoleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, nome: string, token: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, nome: string, telefone: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -136,44 +136,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, nome: string, token: string) => {
-    const trimmedToken = token.trim();
+  const signUp = async (email: string, password: string, nome: string, telefone: string) => {
     const trimmedEmail = email.toLowerCase().trim();
-
-    // Validate invite token using secure RPC function
-    const { data: inviteData, error: inviteError } = await supabase
-      .rpc('validate_invite_token', {
-        p_token: trimmedToken,
-        p_email: trimmedEmail
-      });
-
-    if (inviteError) {
-      console.error('Erro ao verificar convite:', inviteError);
-      return { error: new Error('Erro ao verificar convite. Tente novamente.') };
-    }
-
-    const invite = inviteData?.[0];
-
-    if (!invite || !invite.is_valid) {
-      return { error: new Error('Token de convite inválido ou expirado. Verifique o token e tente novamente.') };
-    }
-
-    // Validate email matches invite (case insensitive)
-    if (invite.email.toLowerCase() !== trimmedEmail) {
-      return { error: new Error(`O email não corresponde ao convite. Use: ${invite.email}`) };
-    }
+    const trimmedTelefone = telefone.replace(/\D/g, ''); // Remove non-digits
 
     const redirectUrl = `${window.location.origin}/`;
 
-    // Create user account
+    // Create user account with telefone in metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: invite.email, // Use email from invite to ensure consistency
+      email: trimmedEmail,
       password,
       options: {
         emailRedirectTo: redirectUrl,
         data: {
           nome,
-          invite_role: invite.role, // Pass role in metadata for trigger
+          telefone: trimmedTelefone,
         },
       },
     });
@@ -181,9 +158,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (authError) {
       return { error: authError as Error };
     }
-
-    // O convite será marcado como usado automaticamente pelo trigger handle_new_user
-    // após a criação do usuário no auth.users
 
     return { error: null };
   };
