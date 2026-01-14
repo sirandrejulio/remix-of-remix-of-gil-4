@@ -33,7 +33,6 @@ import {
   X,
   Sparkles,
   BookOpen,
-  HelpCircle,
   FileEdit,
   Brain,
   Lightbulb,
@@ -441,7 +440,6 @@ const EspecialistaDeEstudos = () => {
                       <TooltipProvider>
                         {[
                           { icon: BookOpen, text: 'Criar plano de estudos', label: 'Plano', gradient: 'from-violet-500/10 to-violet-500/5', hoverGradient: 'hover:from-violet-500/20 hover:to-violet-500/10', iconColor: 'text-violet-500' },
-                          { icon: HelpCircle, text: 'Analisar perfil da banca', label: 'Análise da Banca', gradient: 'from-violet-500/10 to-violet-500/5', hoverGradient: 'hover:from-violet-500/20 hover:to-violet-500/10', iconColor: 'text-violet-500' },
                           { icon: FileEdit, text: 'Gerar resumo de conteúdo', label: 'Resumo', gradient: 'from-violet-500/10 to-violet-500/5', hoverGradient: 'hover:from-violet-500/20 hover:to-violet-500/10', iconColor: 'text-violet-500' },
                           { icon: Brain, text: 'Criar mapa mental', label: 'Mapa', gradient: 'from-violet-500/10 to-violet-500/5', hoverGradient: 'hover:from-violet-500/20 hover:to-violet-500/10', iconColor: 'text-violet-500' },
                           { icon: Lightbulb, text: 'Dicas de prova', label: 'Dicas', gradient: 'from-violet-500/10 to-violet-500/5', hoverGradient: 'hover:from-violet-500/20 hover:to-violet-500/10', iconColor: 'text-violet-500' },

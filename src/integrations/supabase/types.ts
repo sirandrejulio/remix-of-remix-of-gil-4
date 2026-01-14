@@ -620,6 +620,45 @@ export type Database = {
         }
         Relationships: []
       }
+      analises_banca: {
+        Row: {
+          banca: string
+          conteudo: string
+          created_at: string
+          fixada: boolean | null
+          id: string
+          recomendacoes: Json | null
+          resumo: string | null
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          banca: string
+          conteudo: string
+          created_at?: string
+          fixada?: boolean | null
+          id?: string
+          recomendacoes?: Json | null
+          resumo?: string | null
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          banca?: string
+          conteudo?: string
+          created_at?: string
+          fixada?: boolean | null
+          id?: string
+          recomendacoes?: Json | null
+          resumo?: string | null
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       disciplinas: {
         Row: {
           created_at: string
