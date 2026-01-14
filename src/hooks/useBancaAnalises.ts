@@ -21,6 +21,7 @@ export function useBancaAnalises() {
   const [analises, setAnalises] = useState<BancaAnalise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchAnalises = useCallback(async () => {
     if (!user) return;
@@ -128,6 +129,137 @@ Formate o relatório de forma clara e objetiva, com foco em ações práticas qu
     }
   };
 
+  const createAnaliseFromDocument = async (banca: string, documentText: string, fileName: string): Promise<BancaAnalise | null> => {
+    if (!user) return null;
+    
+    setIsGenerating(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('ai-agent-chat', {
+        body: {
+          message: `Analise o documento "${fileName}" enviado pelo aluno sobre a banca ${banca} e gere uma análise completa.
+
+CONTEÚDO DO DOCUMENTO:
+${documentText.substring(0, 15000)}
+${documentText.length > 15000 ? '\n\n[... documento truncado por tamanho ...]' : ''}
+
+Com base no documento acima, realize uma análise completa incluindo:
+
+1. **Síntese do Documento**
+   - Principais pontos identificados no material
+   - Questões ou temas abordados
+   
+2. **Perfil da Banca ${banca}**
+   - Padrões identificados no documento
+   - Disciplinas mais cobradas (aplicar Lei de Pareto 80/20)
+   - Estilo de questões observado
+   
+3. **Pontos de Atenção**
+   - Temas críticos encontrados
+   - Áreas que precisam de mais estudo
+   - Armadilhas comuns identificadas
+   
+4. **Estratégias de Estudo**
+   - Priorização baseada no documento
+   - Técnicas específicas para os temas abordados
+   - Recomendações práticas
+   
+5. **Recomendações Finais**
+   - Próximos passos sugeridos
+   - Materiais complementares
+   - Plano de ação imediato
+
+Formate o relatório de forma clara e objetiva, focando em ações práticas para aprovação.`,
+          action: 'analise_banca_documento',
+          context: { banca, fileName, hasDocument: true }
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData?.session?.access_token}`
+        }
+      });
+
+      if (response.error) throw response.error;
+
+      const conteudo = response.data?.response || response.data?.message || 'Análise gerada com sucesso.';
+      
+      const palavras = conteudo.split(' ');
+      const resumo = `📄 ${fileName} - ${palavras.slice(0, 40).join(' ')}${palavras.length > 40 ? '...' : ''}`;
+
+      const { data, error } = await supabase
+        .from('analises_banca')
+        .insert({
+          user_id: user.id,
+          titulo: `Análise ${banca} - ${fileName}`,
+          banca,
+          conteudo,
+          resumo,
+          recomendacoes: null,
+          fixada: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      toast.success('Análise do documento gerada com sucesso!');
+      await fetchAnalises();
+      return data as BancaAnalise;
+    } catch (error) {
+      console.error('Erro ao criar análise do documento:', error);
+      toast.error('Erro ao gerar análise do documento. Tente novamente.');
+      return null;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const parseDocument = async (file: File): Promise<string | null> => {
+    setIsUploading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        throw new Error('Sessão não encontrada');
+      }
+
+      // Convert file to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await supabase.functions.invoke('parse-document', {
+        body: {
+          fileData: base64Data,
+          fileName: file.name,
+          fileType: file.type
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`
+        }
+      });
+
+      if (response.error) throw response.error;
+      
+      if (!response.data?.success || !response.data?.text) {
+        throw new Error(response.data?.error || 'Falha ao extrair texto do documento');
+      }
+
+      return response.data.text;
+    } catch (error) {
+      console.error('Erro ao processar documento:', error);
+      toast.error('Erro ao processar documento. Verifique o formato do arquivo.');
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const deleteAnalise = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -170,8 +302,11 @@ Formate o relatório de forma clara e objetiva, com foco em ações práticas qu
     analises,
     isLoading,
     isGenerating,
+    isUploading,
     fetchAnalises,
     createAnalise,
+    createAnaliseFromDocument,
+    parseDocument,
     deleteAnalise,
     pinAnalise
   };
