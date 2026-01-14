@@ -274,49 +274,90 @@ function extractTemaFromBlock(block: string): { tema: string; subtema?: string }
   return { tema: 'Geral' };
 }
 
-// NEW: Strategy for structured format with QUESTÃO, BANCA, ANO, TEMA, Enunciado, Alternativas, GABARITO
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * ESTRATÉGIA PRINCIPAL: Formato Estruturado
+ * ═══════════════════════════════════════════════════════════════
+ * 
+ * PADRÃO 1 (Simples - sem BANCA/ANO):
+ *   QUESTÃO X
+ *   TEMA: Cartões de Crédito / Crédito Rotativo
+ *   Enunciado: texto da questão...
+ *   Alternativas:
+ *   A texto da alternativa A
+ *   B texto da alternativa B
+ *   ...
+ *   GABARITO: B
+ *   ---
+ * 
+ * PADRÃO 2 (Completo - com BANCA/ANO):
+ *   QUESTÃO X
+ *   BANCA: CESGRANRIO
+ *   ANO: 2018
+ *   TEMA: Juros Compostos / Rentabilidade
+ *   Enunciado: texto da questão...
+ *   Alternativas:
+ *   (A) texto da alternativa A
+ *   (B) texto da alternativa B
+ *   ...
+ *   GABARITO: B
+ *   ---
+ */
 function extractByStructuredFormat(text: string): any[] {
   const questions: any[] = [];
   
-  // Split by "QUESTÃO X" or "---" separator
+  // Split by "QUESTÃO X" ou separador "---"
   const questionBlocks = text.split(/(?=QUEST[ÃA]O\s*\d+)|(?:^|\n)---+(?:\n|$)/i)
     .filter(b => b.trim().length > 50);
   
-  console.log(`Structured format: Found ${questionBlocks.length} potential blocks`);
+  console.log(`[StructuredFormat] Encontrados ${questionBlocks.length} blocos potenciais`);
   
   for (const block of questionBlocks) {
-    // Extract BANCA
+    // Detecta número da questão
+    const numMatch = block.match(/QUEST[ÃA]O\s*(\d+)/i);
+    const numero = numMatch ? parseInt(numMatch[1]) : undefined;
+    
+    // PADRÃO 2: Extrai BANCA (opcional)
     let banca = 'Não identificada';
     const bancaMatch = block.match(/BANCA:\s*([^\n]+)/i);
     if (bancaMatch) {
       banca = bancaMatch[1].trim();
     }
     
-    // Extract ANO
+    // PADRÃO 2: Extrai ANO (opcional)
     let ano: number | undefined;
     const anoMatch = block.match(/ANO:\s*(\d{4})/i);
     if (anoMatch) {
       ano = parseInt(anoMatch[1]);
     }
     
-    // Extract TEMA
+    // AMBOS PADRÕES: Extrai TEMA (obrigatório)
     const { tema, subtema } = extractTemaFromBlock(block);
     
-    // Extract Enunciado - look for "Enunciado:" label
+    // AMBOS PADRÕES: Extrai Enunciado
     const enunciadoMatch = block.match(/Enunciado:\s*([\s\S]*?)(?=Alternativas?:|$)/i);
-    if (!enunciadoMatch) continue;
+    if (!enunciadoMatch) {
+      console.log(`[StructuredFormat] Bloco sem "Enunciado:" - pulando`);
+      continue;
+    }
     
     const enunciado = enunciadoMatch[1].trim();
-    if (enunciado.length < 15) continue;
+    if (enunciado.length < 15) {
+      console.log(`[StructuredFormat] Enunciado muito curto (${enunciado.length} chars) - pulando`);
+      continue;
+    }
     
-    // Extract Alternativas
+    // AMBOS PADRÕES: Extrai Alternativas
     const alternativasMatch = block.match(/Alternativas?:\s*([\s\S]*?)(?=GABARITO:|Resposta:|$)/i);
-    if (!alternativasMatch) continue;
+    if (!alternativasMatch) {
+      console.log(`[StructuredFormat] Bloco sem "Alternativas:" - pulando`);
+      continue;
+    }
     
     const altsText = alternativasMatch[1];
     const alts: Record<string, string> = {};
     
-    // Pattern 1: "(A) texto" or "(B) texto" - with parentheses
+    // PADRÃO 2: "(A) texto" - com parênteses
     const altPatternParen = /\(([A-E])\)\s*([^\n]+)/gi;
     let match;
     while ((match = altPatternParen.exec(altsText)) !== null) {
@@ -326,27 +367,41 @@ function extractByStructuredFormat(text: string): any[] {
       }
     }
     
-    // Pattern 2: "A texto" or "A R$ 5.800,00." - without parentheses
+    // PADRÃO 1: "A texto" - sem parênteses (apenas letra + espaço)
     if (Object.keys(alts).length < 3) {
-      const altPatternSimple = /(?:^|\n)\s*([A-E])[\s\.\)]+([^\n]+)/gm;
-      while ((match = altPatternSimple.exec(altsText)) !== null) {
-        const letter = match[1].toUpperCase();
-        if (!alts[letter]) {
-          alts[letter] = match[2].trim().replace(/\.$/, '');
+      const lines = altsText.split('\n');
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        // Match: "A texto" ou "A) texto" ou "A. texto"
+        const simpleMatch = trimmedLine.match(/^([A-E])[\s\)\.]+(.+)$/i);
+        if (simpleMatch) {
+          const letter = simpleMatch[1].toUpperCase();
+          if (!alts[letter]) {
+            let altText = simpleMatch[2].trim().replace(/\.$/, '');
+            if (altText.length > 0) {
+              alts[letter] = altText;
+            }
+          }
         }
       }
     }
     
-    if (Object.keys(alts).length < 3) continue;
+    if (Object.keys(alts).length < 3) {
+      console.log(`[StructuredFormat] Apenas ${Object.keys(alts).length} alternativas encontradas - pulando`);
+      continue;
+    }
     
-    // Extract GABARITO
+    // AMBOS PADRÕES: Extrai GABARITO
     let resposta = '?';
     const gabaritoMatch = block.match(/GABARITO:\s*([A-E])/i);
     if (gabaritoMatch) {
       resposta = gabaritoMatch[1].toUpperCase();
     }
     
-    console.log(`Extracted question: tema="${tema}", banca="${banca}", ano=${ano || 'N/A'}`);
+    // Detecta qual padrão foi usado
+    const formato = (bancaMatch || anoMatch) ? 'padrao2' : 'padrao1';
+    
+    console.log(`[StructuredFormat] ✓ Q${numero || '?'}: tema="${tema}", banca="${banca}", ano=${ano || 'N/A'}, formato=${formato}, gabarito=${resposta}`);
     
     questions.push({
       enunciado,
@@ -359,7 +414,9 @@ function extractByStructuredFormat(text: string): any[] {
       tema,
       subtema,
       banca,
-      ano_referencia: ano
+      ano_referencia: ano,
+      numero,
+      formato
     });
   }
   
