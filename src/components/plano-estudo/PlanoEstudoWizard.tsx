@@ -13,6 +13,8 @@ import { toast } from "sonner";
 
 interface PlanoEstudoWizardProps {
   onComplete: (data: any) => void;
+  onCancel?: () => void;
+  existingPlan?: any;
 }
 
 export interface PlanoFormData {
@@ -32,7 +34,7 @@ const STEPS = [
   { id: 4, title: "Gerar Plano", description: "Plano personalizado com IA" },
 ];
 
-export function PlanoEstudoWizard({ onComplete }: PlanoEstudoWizardProps) {
+export function PlanoEstudoWizard({ onComplete, onCancel, existingPlan }: PlanoEstudoWizardProps) {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -242,12 +244,12 @@ export function PlanoEstudoWizard({ onComplete }: PlanoEstudoWizardProps) {
       <div className="flex justify-between mt-6">
         <Button
           variant="outline"
-          onClick={handleBack}
-          disabled={currentStep === 1 || isGenerating}
+          onClick={currentStep === 1 ? onCancel : handleBack}
+          disabled={isGenerating}
           className="gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar
+          {currentStep === 1 ? 'Voltar' : 'Anterior'}
         </Button>
 
         {currentStep < STEPS.length ? (

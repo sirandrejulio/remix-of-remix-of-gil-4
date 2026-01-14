@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,18 +7,18 @@ import {
   Calendar, 
   Clock, 
   Target, 
-  Building2, 
-  GraduationCap, 
-  Sparkles,
   Edit2,
   AlertTriangle,
   TrendingUp,
   BookOpen,
-  CheckCircle2,
   Zap,
   PieChart,
   LineChart,
-  Trophy
+  Trophy,
+  ArrowLeft,
+  Trash2,
+  Plus,
+  Sparkles
 } from "lucide-react";
 import { ProgressoPareto } from "@/components/dashboard/ProgressoPareto";
 import { EvolucaoParetoChart } from "@/components/dashboard/EvolucaoParetoChart";
@@ -26,10 +26,24 @@ import { MetasGamificacao } from "@/components/dashboard/MetasGamificacao";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PlanoEstudoDashboardProps {
   planoData: any;
   onEdit: () => void;
+  onDelete: () => void;
+  onNewPlan: () => void;
+  onBack: () => void;
 }
 
 const getConcursoNome = (id: string) => {
@@ -42,7 +56,7 @@ const getConcursoNome = (id: string) => {
   return map[id] || id;
 };
 
-export function PlanoEstudoDashboard({ planoData, onEdit }: PlanoEstudoDashboardProps) {
+export function PlanoEstudoDashboard({ planoData, onEdit, onDelete, onNewPlan, onBack }: PlanoEstudoDashboardProps) {
   const [activeTab, setActiveTab] = useState("visao-geral");
 
   const planoGerado = planoData?.plano_gerado || {};
@@ -59,6 +73,14 @@ export function PlanoEstudoDashboard({ planoData, onEdit }: PlanoEstudoDashboard
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onBack}
+            className="h-10 w-10 rounded-xl"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-lg shadow-primary/25">
             <Calendar className="h-6 w-6 text-primary-foreground" />
           </div>
@@ -71,10 +93,38 @@ export function PlanoEstudoDashboard({ planoData, onEdit }: PlanoEstudoDashboard
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={onEdit} className="gap-2">
-          <Edit2 className="h-4 w-4" />
-          Editar Plano
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={onEdit} className="gap-2">
+            <Edit2 className="h-4 w-4" />
+            Editar Plano Atual
+          </Button>
+          <Button variant="outline" onClick={onNewPlan} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Plano
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="gap-2 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/10">
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir Plano de Estudos?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita. Seu plano de estudos atual será permanentemente excluído, incluindo todas as configurações e preferências.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Excluir Plano
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Alertas */}
