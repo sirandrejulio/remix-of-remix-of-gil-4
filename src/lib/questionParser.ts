@@ -1,27 +1,41 @@
 /**
  * Parser de Questões - Reconhece múltiplos padrões de formatação
+ * Sistema Bancário Ágil - Upload de Questões
  * 
- * PADRÃO 1 (Simples):
+ * ═══════════════════════════════════════════════════════════════
+ * PADRÃO 1 (Simples - sem BANCA/ANO):
+ * ═══════════════════════════════════════════════════════════════
  * QUESTÃO X
  * TEMA: Cartões de Crédito / Crédito Rotativo
- * Enunciado: texto...
+ * Enunciado: texto da questão...
  * Alternativas:
- * A texto
- * B texto
- * ...
+ * A texto da alternativa A
+ * B texto da alternativa B
+ * C texto da alternativa C
+ * D texto da alternativa D
+ * E texto da alternativa E
  * GABARITO: B
+ * ---
  * 
- * PADRÃO 2 (Completo):
+ * ═══════════════════════════════════════════════════════════════
+ * PADRÃO 2 (Completo - com BANCA/ANO):
+ * ═══════════════════════════════════════════════════════════════
  * QUESTÃO X
  * BANCA: CESGRANRIO
  * ANO: 2018
  * TEMA: Juros Compostos / Rentabilidade
- * Enunciado: texto...
+ * Enunciado: texto da questão...
  * Alternativas:
- * (A) texto
- * (B) texto
- * ...
+ * (A) texto da alternativa A
+ * (B) texto da alternativa B
+ * (C) texto da alternativa C
+ * (D) texto da alternativa D
+ * (E) texto da alternativa E
  * GABARITO: B
+ * ---
+ * 
+ * Ambos os padrões são automaticamente detectados e parseados.
+ * O separador "---" entre questões é opcional mas recomendado.
  */
 
 export type QuestionFormat = 'padrao1' | 'padrao2' | 'desconhecido';
@@ -117,18 +131,26 @@ function extractTema(block: string): { tema: string; subtema?: string } {
 
 /**
  * Extrai alternativas de um bloco de texto
- * Suporta formatos:
- * - A texto
- * - (A) texto
- * - a) texto
+ * Suporta múltiplos formatos:
+ * 
+ * PADRÃO 1 (Simples): 
+ *   A texto da alternativa
+ *   B texto da alternativa
+ * 
+ * PADRÃO 2 (Com parênteses):
+ *   (A) texto da alternativa
+ *   (B) texto da alternativa
+ * 
+ * PADRÃO 3 (Com fechamento):
+ *   a) texto da alternativa
+ *   b) texto da alternativa
  */
 function extractAlternatives(altsText: string): Record<string, string> {
   const alts: Record<string, string> = {};
-  
-  // Padrão 1: (A) texto ou (a) texto
-  const parenPattern = /\(([A-Ea-e])\)\s*([^\n]+)/g;
   let match;
   
+  // PADRÃO 2: (A) texto ou (a) texto - com parênteses
+  const parenPattern = /\(([A-Ea-e])\)\s*([^\n]+)/g;
   while ((match = parenPattern.exec(altsText)) !== null) {
     const letter = match[1].toUpperCase();
     if (!alts[letter]) {
@@ -136,23 +158,30 @@ function extractAlternatives(altsText: string): Record<string, string> {
     }
   }
   
-  // Padrão 2: A texto ou a) texto (sem parênteses)
+  // PADRÃO 1: A texto - letra seguida de espaço (sem parênteses)
   if (Object.keys(alts).length < 3) {
-    // Procura linhas que começam com letra + espaço ou letra + )
     const lines = altsText.split('\n');
     
     for (const line of lines) {
-      const simpleMatch = line.match(/^([A-Ea-e])[\s\)\.]+(.+)$/);
+      const trimmedLine = line.trim();
+      
+      // Padrão: "A texto" ou "A) texto" ou "A. texto"
+      const simpleMatch = trimmedLine.match(/^([A-Ea-e])[\s\)\.]+(.+)$/);
       if (simpleMatch) {
         const letter = simpleMatch[1].toUpperCase();
         if (!alts[letter]) {
-          alts[letter] = simpleMatch[2].trim().replace(/\.$/, '');
+          // Limpa o texto removendo ponto final e espaços extras
+          let altText = simpleMatch[2].trim();
+          altText = altText.replace(/\.$/, '').trim();
+          if (altText.length > 0) {
+            alts[letter] = altText;
+          }
         }
       }
     }
   }
   
-  // Padrão 3: Alternativas inline separadas por letra maiúscula
+  // PADRÃO 3: Alternativas inline (backup para formatos não-padrão)
   if (Object.keys(alts).length < 3) {
     const inlinePattern = /(?:^|\s)([A-E])\s+([^A-E\n]{5,}?)(?=\s+[A-E]\s+|$)/gi;
     while ((match = inlinePattern.exec(altsText)) !== null) {
