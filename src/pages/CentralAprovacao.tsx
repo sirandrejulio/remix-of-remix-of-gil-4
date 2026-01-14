@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DottedSurface } from "@/components/ui/dotted-surface";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,6 +7,8 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -48,11 +50,18 @@ import {
   Activity,
   Zap,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  Upload,
+  Download,
+  FileUp,
+  X,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import especialistaAvatar from '@/assets/especialista-avatar.png';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
 
 const BANCAS = [
   'CESGRANRIO',
@@ -68,10 +77,24 @@ const BANCAS = [
 const CentralAprovacao = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
-  const { analises, isLoading, isGenerating, createAnalise, deleteAnalise, pinAnalise } = useBancaAnalises();
+  const { 
+    analises, 
+    isLoading, 
+    isGenerating, 
+    isUploading,
+    createAnalise, 
+    createAnaliseFromDocument,
+    parseDocument,
+    deleteAnalise, 
+    pinAnalise 
+  } = useBancaAnalises();
   
   const [selectedBanca, setSelectedBanca] = useState<string>('');
   const [selectedAnalise, setSelectedAnalise] = useState<BancaAnalise | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -81,9 +104,186 @@ const CentralAprovacao = () => {
 
   const handleGenerateAnalise = async () => {
     if (!selectedBanca) return;
-    const analise = await createAnalise(selectedBanca);
-    if (analise) {
-      setSelectedAnalise(analise);
+    
+    if (uploadedFile) {
+      // Parse document and generate analysis
+      const documentText = await parseDocument(uploadedFile);
+      if (documentText) {
+        const analise = await createAnaliseFromDocument(selectedBanca, documentText, uploadedFile.name);
+        if (analise) {
+          setSelectedAnalise(analise);
+          setUploadedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      }
+    } else {
+      // Generate analysis without document
+      const analise = await createAnalise(selectedBanca);
+      if (analise) {
+        setSelectedAnalise(analise);
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const allowedTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'text/plain'
+      ];
+      const allowedExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+      
+      const hasValidExtension = allowedExtensions.some(ext => 
+        file.name.toLowerCase().endsWith(ext)
+      );
+      
+      if (!allowedTypes.includes(file.type) && !hasValidExtension) {
+        toast.error('Formato não suportado. Use PDF, DOC, DOCX ou TXT.');
+        return;
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Arquivo muito grande. Máximo 10MB.');
+        return;
+      }
+      
+      setUploadedFile(file);
+      toast.success(`Arquivo "${file.name}" selecionado`);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!selectedAnalise) return;
+    
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - (margin * 2);
+      let yPosition = margin;
+      
+      // Header
+      pdf.setFillColor(245, 158, 11); // amber-500
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(20);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('Central da Aprovação', margin, 22);
+      
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Análise de Banca: ${selectedAnalise.banca}`, margin, 30);
+      
+      yPosition = 50;
+      
+      // Title
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(16);
+      pdf.text(selectedAnalise.titulo, margin, yPosition);
+      yPosition += 10;
+      
+      // Date
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Gerado em: ${new Date(selectedAnalise.created_at).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`, margin, yPosition);
+      yPosition += 15;
+      
+      // Content - Process markdown to plain text
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(11);
+      
+      const content = selectedAnalise.conteudo
+        .replace(/#{1,6}\s*/g, '') // Remove markdown headers
+        .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold markers
+        .replace(/\*([^*]+)\*/g, '$1') // Remove italic markers
+        .replace(/`([^`]+)`/g, '$1') // Remove code markers
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
+        .replace(/^\s*[-*+]\s*/gm, '• ') // Convert list markers to bullets
+        .replace(/^\s*\d+\.\s*/gm, (match) => match); // Keep numbered lists
+      
+      const lines = content.split('\n');
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) {
+          yPosition += 5;
+          continue;
+        }
+        
+        // Check for headers (lines that were bold or are short titles)
+        const isHeader = trimmedLine.length < 60 && 
+          (trimmedLine.endsWith(':') || 
+           /^\d+\./.test(trimmedLine) ||
+           trimmedLine.startsWith('•'));
+        
+        if (isHeader && !trimmedLine.startsWith('•')) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(12);
+          yPosition += 3;
+        } else {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(11);
+        }
+        
+        const splitText = pdf.splitTextToSize(trimmedLine, maxWidth);
+        
+        for (const textLine of splitText) {
+          if (yPosition > pageHeight - margin) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          pdf.text(textLine, margin, yPosition);
+          yPosition += 6;
+        }
+      }
+      
+      // Footer on each page
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(9);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(
+          `Página ${i} de ${totalPages} | Central da Aprovação - Lei de Pareto aplicada`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
+      
+      // Save
+      const fileName = `analise-${selectedAnalise.banca.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      toast.success('PDF exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast.error('Erro ao exportar PDF. Tente novamente.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -199,20 +399,61 @@ const CentralAprovacao = () => {
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/* Upload de Documento */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Upload className="w-3 h-3" />
+                    Anexar documento (opcional)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    {uploadedFile ? (
+                      <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg border border-border/50">
+                        <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                        <span className="text-xs truncate flex-1">{uploadedFile.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={handleRemoveFile}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="file-upload"
+                        className="flex items-center gap-2 p-2 bg-muted/20 rounded-lg border border-dashed border-border/50 cursor-pointer hover:bg-muted/30 transition-colors"
+                      >
+                        <FileUp className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">PDF, DOC, DOCX ou TXT</span>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <Button
                   onClick={handleGenerateAnalise}
-                  disabled={!selectedBanca || isGenerating}
+                  disabled={!selectedBanca || isGenerating || isUploading}
                   className="w-full gap-2"
                 >
-                  {isGenerating ? (
+                  {isGenerating || isUploading ? (
                     <>
                       <Activity className="w-4 h-4 animate-spin" />
-                      Gerando Análise...
+                      {isUploading ? 'Processando...' : 'Gerando Análise...'}
                     </>
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      Nova Análise
+                      {uploadedFile ? 'Analisar Documento' : 'Nova Análise'}
                     </>
                   )}
                 </Button>
@@ -305,6 +546,22 @@ const CentralAprovacao = () => {
               </div>
 
               <div className="flex items-center gap-3">
+                {selectedAnalise && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                    className="gap-2"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Exportar PDF</span>
+                  </Button>
+                )}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
                   <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
                   <span className="text-xs text-muted-foreground">Lei de Pareto</span>
@@ -318,21 +575,36 @@ const CentralAprovacao = () => {
 
             {/* Conteúdo */}
             <ScrollArea className="flex-1 relative">
-              <div className="p-4 lg:p-6">
+              <div className="p-4 lg:p-6" ref={contentRef}>
                 {selectedAnalise ? (
                   <div className="max-w-4xl mx-auto">
                     <Card className="bg-gradient-to-br from-muted/60 to-muted/30 border-border/50 shadow-xl">
                       <CardHeader>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-amber-500" />
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center">
+                              <FileText className="w-5 h-5 text-amber-500" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-lg">{selectedAnalise.banca}</CardTitle>
+                              <p className="text-xs text-muted-foreground">
+                                Gerado em {formatDate(selectedAnalise.created_at)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <CardTitle className="text-lg">{selectedAnalise.banca}</CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                              Gerado em {formatDate(selectedAnalise.created_at)}
-                            </p>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="gap-2 lg:hidden"
+                          >
+                            {isExporting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </Button>
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -368,11 +640,12 @@ const CentralAprovacao = () => {
                     </p>
 
                     {/* Features */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl animate-fade-in" style={{ animationDelay: '250ms' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 max-w-4xl animate-fade-in" style={{ animationDelay: '250ms' }}>
                       {[
                         { icon: BarChart3, title: 'Análise de Padrões', desc: 'Identifique os temas mais cobrados' },
                         { icon: Target, title: 'Lei de Pareto', desc: '80% do resultado com 20% do esforço' },
-                        { icon: Zap, title: 'Estratégias Práticas', desc: 'Ações imediatas para sua aprovação' }
+                        { icon: Upload, title: 'Upload de Documentos', desc: 'Envie PDFs e DOCs para análise' },
+                        { icon: Download, title: 'Exportar PDF', desc: 'Baixe suas análises para estudar offline' }
                       ].map((feature, i) => (
                         <Card key={i} className="bg-gradient-to-br from-muted/40 to-muted/20 border-border/30">
                           <CardContent className="p-4 text-center">
