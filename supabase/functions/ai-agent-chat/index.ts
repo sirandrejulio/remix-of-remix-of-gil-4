@@ -14,11 +14,15 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 const inputSchema = z.object({
   message: z.string().max(10000).optional(),
   sessionId: z.string().regex(uuidRegex, 'sessionId deve ser um UUID válido').optional().nullable(),
-  action: z.enum(['generate_document', 'analyze_file', 'chat']).optional(),
+  action: z.enum(['generate_document', 'analyze_file', 'chat', 'generate_study_plan']).optional(),
   context: z.object({
     documentType: z.string().max(100).optional(),
     topic: z.string().max(500).optional(),
     fileContent: z.string().max(50000).optional(),
+    concurso: z.string().max(100).optional(),
+    nivelCargo: z.string().max(50).optional(),
+    horasSemanais: z.number().optional(),
+    disponibilidade: z.record(z.array(z.string())).optional(),
   }).optional(),
 });
 
@@ -451,6 +455,62 @@ Execute a análise COMPLETA seguindo o protocolo:
 
 ✅ **PRÓXIMO PASSO**
 - Uma ação concreta para o aluno fazer agora`;
+
+    } else if (action === 'generate_study_plan') {
+      userPrompt = `📚 **GERAÇÃO DE PLANO DE ESTUDOS PERSONALIZADO**
+
+O aluno solicitou a criação de um plano de estudos completo com os seguintes parâmetros:
+
+- **Concurso alvo**: ${context?.concurso || 'Não especificado'}
+- **Nível do cargo**: ${context?.nivelCargo || 'Não especificado'}
+- **Horas semanais disponíveis**: ${context?.horasSemanais || 0}h
+- **Disponibilidade de horários**: ${JSON.stringify(context?.disponibilidade || {})}
+
+**MENSAGEM DO ALUNO**: ${message || 'Gere meu plano de estudos personalizado'}
+
+**INSTRUÇÕES OBRIGATÓRIAS:**
+
+Aplique rigorosamente a **Lei de Pareto 80/20** e crie um plano estruturado em JSON com:
+
+1. **Distribuição de Horas por Disciplina** - Priorize GRUPO 1 (75% do tempo):
+   - Informática (22,5 pts)
+   - Vendas e Negociação (22,5 pts)
+   - Língua Portuguesa (15 pts)
+   - Conhecimentos Bancários (15 pts)
+
+2. **Cronograma Semanal Detalhado** - Use os horários disponíveis do aluno
+
+3. **Metas Semanais** - Objetivos claros e mensuráveis
+
+4. **Técnicas de Estudo** - Recomendações específicas para cada matéria
+
+5. **Alertas e Dicas** - Pontos de atenção e armadilhas da banca
+
+**RETORNE OBRIGATORIAMENTE em formato JSON válido** seguindo esta estrutura:
+
+\`\`\`json
+{
+  "titulo": "Plano de Estudos - [Concurso]",
+  "resumo": "Resumo executivo do plano",
+  "distribuicaoHoras": {
+    "grupo1": { "disciplina": "nome", "horas": X, "percentual": Y },
+    ...
+  },
+  "cronogramaSemanal": {
+    "segunda": [{ "horario": "08:00-10:00", "disciplina": "...", "atividade": "..." }],
+    ...
+  },
+  "metasSemanais": [
+    { "semana": 1, "objetivo": "...", "indicadores": [...] },
+    ...
+  ],
+  "tecnicasEstudo": [
+    { "disciplina": "...", "tecnicas": [...], "recursos": [...] }
+  ],
+  "alertas": ["..."],
+  "proximosPassos": ["..."]
+}
+\`\`\``;
 
     } else if (message && message.toLowerCase().includes('[arquivos anexados:')) {
       // User sent a message with attached files
