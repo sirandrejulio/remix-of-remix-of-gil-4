@@ -26,7 +26,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Bot,
   GraduationCap,
   MessageSquare,
   FileText,
@@ -46,6 +45,7 @@ import {
   Wifi
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import especialistaAvatar from '@/assets/especialista-avatar.png';
 
 const EspecialistaDeEstudos = () => {
   const navigate = useNavigate();
@@ -414,8 +414,8 @@ const EspecialistaDeEstudos = () => {
                   <div className="h-full min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
                     {/* Hero icon with enhanced glow */}
                     <div className="relative mb-8 animate-fade-in">
-                      <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet-500/10 flex items-center justify-center shadow-2xl border border-primary/10">
-                        <Bot className="w-14 h-14 text-primary" />
+                      <div className="w-28 h-28 rounded-3xl flex items-center justify-center">
+                        <img src={especialistaAvatar} alt="Especialista de Estudos" className="w-24 h-24 object-contain" />
                       </div>
                       <div className="absolute inset-0 rounded-3xl bg-primary/10 blur-2xl animate-pulse" />
                       <div className="absolute -top-3 -right-3 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg animate-bounce">
@@ -496,8 +496,8 @@ const EspecialistaDeEstudos = () => {
                     ))}
                     {isLoading && (
                       <div className="flex gap-4 p-5 rounded-2xl bg-gradient-to-br from-muted/60 to-muted/30 border border-border/50 mr-8 animate-fade-in shadow-lg backdrop-blur-sm">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center">
-                          <Bot className="w-5 h-5 text-primary animate-pulse" />
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+                          <img src={especialistaAvatar} alt="Especialista" className="w-8 h-8 object-contain animate-pulse" />
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold mb-2 flex items-center gap-2">
