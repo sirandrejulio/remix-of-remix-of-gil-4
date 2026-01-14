@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserPlus, Sparkles, Key, User, Mail } from 'lucide-react';
+import { Loader2, UserPlus, Sparkles, Key, User, Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserRegistrationProps {
@@ -19,17 +19,23 @@ export function UserRegistration({ onUserCreated, currentUserId }: UserRegistrat
   
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
+  const [registerTelefone, setRegisterTelefone] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerRole, setRegisterRole] = useState<'admin' | 'user'>('user');
 
   const handleDirectRegister = async () => {
-    if (!registerEmail || !registerPassword || !registerName) {
+    if (!registerEmail || !registerPassword || !registerName || !registerTelefone) {
       toast.error('Preencha todos os campos');
       return;
     }
 
     if (registerPassword.length < 6) {
       toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    if (registerTelefone.replace(/\D/g, '').length < 10) {
+      toast.error('Telefone deve ter no mínimo 10 dígitos');
       return;
     }
 
@@ -49,6 +55,7 @@ export function UserRegistration({ onUserCreated, currentUserId }: UserRegistrat
           email: registerEmail.trim().toLowerCase(),
           password: registerPassword,
           nome: registerName,
+          telefone: registerTelefone.replace(/\D/g, ''),
           role: registerRole,
         },
       });
@@ -79,6 +86,7 @@ export function UserRegistration({ onUserCreated, currentUserId }: UserRegistrat
   const resetForm = () => {
     setRegisterName('');
     setRegisterEmail('');
+    setRegisterTelefone('');
     setRegisterPassword('');
     setRegisterRole('user');
   };
@@ -138,6 +146,20 @@ export function UserRegistration({ onUserCreated, currentUserId }: UserRegistrat
                 placeholder="usuario@email.com"
                 value={registerEmail}
                 onChange={(e) => setRegisterEmail(e.target.value)}
+                className="bg-background/50 border-border/50"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5" />
+                Telefone (WhatsApp)
+              </Label>
+              <Input
+                type="tel"
+                placeholder="(11) 99999-9999"
+                value={registerTelefone}
+                onChange={(e) => setRegisterTelefone(e.target.value)}
                 className="bg-background/50 border-border/50"
               />
             </div>

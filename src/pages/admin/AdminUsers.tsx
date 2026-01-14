@@ -20,6 +20,7 @@ interface UserWithRole {
   id: string;
   nome: string;
   email: string;
+  telefone: string | null;
   role: 'admin' | 'user';
   status: 'ativo' | 'pendente' | 'bloqueado';
   created_at: string;
@@ -95,7 +96,7 @@ export default function AdminUsers() {
     setIsLoading(true);
     try {
       const [profilesResult, rolesResult] = await Promise.all([
-        supabase.from('profiles').select('id, nome, email, status, created_at').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, nome, email, telefone, status, created_at').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('user_id, role'),
       ]);
 
@@ -103,6 +104,7 @@ export default function AdminUsers() {
         const userRole = rolesResult.data?.find((r) => r.user_id === profile.id);
         return {
           ...profile,
+          telefone: profile.telefone || null,
           role: (userRole?.role as 'admin' | 'user') || 'user',
           status: (profile.status as 'ativo' | 'pendente' | 'bloqueado') || 'ativo',
         };

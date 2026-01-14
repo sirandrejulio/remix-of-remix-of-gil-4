@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { 
   CheckCircle2, Clock, XCircle, Shield, MoreVertical, 
-  UserCheck, UserX, Trash2, Edit3, Loader2, AlertTriangle
+  UserCheck, UserX, Trash2, Edit3, Loader2, AlertTriangle, Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +34,7 @@ interface UserWithRole {
   id: string;
   nome: string;
   email: string;
+  telefone: string | null;
   role: 'admin' | 'user';
   status: 'ativo' | 'pendente' | 'bloqueado';
   created_at: string;
@@ -149,6 +150,7 @@ export function UsersTable({
                 />
               </TableHead>
               <TableHead className="text-muted-foreground font-semibold">Usuário</TableHead>
+              <TableHead className="text-muted-foreground font-semibold">Telefone</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Perfil</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Cadastro</TableHead>
@@ -213,6 +215,22 @@ export function UsersTable({
                         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                       </div>
                     </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    {user.telefone ? (
+                      <a 
+                        href={`https://wa.me/55${user.telefone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        {user.telefone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/50">Não informado</span>
+                    )}
                   </TableCell>
                   
                   <TableCell>

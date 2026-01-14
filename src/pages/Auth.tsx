@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GraduationCap, Loader2, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Loader2, Mail, Lock, User, ArrowLeft, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -20,23 +20,19 @@ const signupSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
-  token: z.string().min(1, 'Token de convite é obrigatório'),
+  telefone: z.string().min(10, 'Telefone deve ter no mínimo 10 dígitos').max(15, 'Telefone inválido'),
 });
 
 export default function Auth() {
-  const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get('token') || '';
-  const inviteEmail = searchParams.get('email') || '';
-
-  const [activeTab, setActiveTab] = useState(inviteToken ? 'signup' : 'login');
+  const [activeTab, setActiveTab] = useState('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signupData, setSignupData] = useState({ 
     nome: '', 
-    email: inviteEmail, 
+    email: '', 
     password: '', 
-    token: inviteToken 
+    telefone: ''
   });
 
   const { signIn, signUp, user } = useAuth();
@@ -81,7 +77,7 @@ export default function Auth() {
 
     try {
       const validated = signupSchema.parse(signupData);
-      const { error } = await signUp(validated.email, validated.password, validated.nome, validated.token);
+      const { error } = await signUp(validated.email, validated.password, validated.nome, validated.telefone);
 
       if (error) {
         if (error.message.includes('already registered')) {
@@ -90,7 +86,8 @@ export default function Auth() {
           toast.error(error.message);
         }
       } else {
-        toast.success('Conta criada com sucesso! Verifique seu email para confirmar.');
+        toast.success('Conta criada com sucesso!');
+        setActiveTab('login');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -131,7 +128,7 @@ export default function Auth() {
             <CardDescription className="text-sm">
               {activeTab === 'login' 
                 ? 'Entre com suas credenciais para continuar'
-                : 'Crie sua conta com o convite recebido'}
+                : 'Crie sua conta para começar a estudar'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -191,21 +188,6 @@ export default function Auth() {
               <TabsContent value="signup" className="mt-0">
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-token" className="text-sm">Token de Convite</Label>
-                    <Input
-                      id="signup-token"
-                      type="text"
-                      placeholder="Cole aqui o token do convite"
-                      value={signupData.token}
-                      onChange={(e) => setSignupData({ ...signupData, token: e.target.value })}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Você precisa de um convite para criar sua conta
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="signup-nome" className="text-sm">Nome Completo</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -235,6 +217,25 @@ export default function Auth() {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-telefone" className="text-sm">Telefone (WhatsApp)</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signup-telefone"
+                        type="tel"
+                        placeholder="(11) 99999-9999"
+                        className="pl-10"
+                        value={signupData.telefone}
+                        onChange={(e) => setSignupData({ ...signupData, telefone: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Usado para contato e recuperação de conta
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -270,7 +271,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
-          Sistema exclusivo para convidados.
+          Plataforma de estudos para concursos bancários.
         </p>
       </div>
     </div>
