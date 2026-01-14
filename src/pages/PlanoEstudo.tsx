@@ -7,6 +7,7 @@ import { PlanoEstudoDashboard } from "@/components/plano-estudo/PlanoEstudoDashb
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PlanoEstudo() {
   const { user } = useAuth();
@@ -14,35 +15,86 @@ export default function PlanoEstudo() {
   const [loading, setLoading] = useState(true);
   const [hasPlano, setHasPlano] = useState(false);
   const [planoData, setPlanoData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const fetchPlano = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('planos_estudo')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (data && data.plano_status !== 'pendente') {
+        setHasPlano(true);
+        setPlanoData(data);
+        setIsEditing(false);
+      } else {
+        setHasPlano(false);
+        setPlanoData(null);
+      }
+    } catch (error) {
+      console.error('Error checking plano:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const checkPlano = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('planos_estudo')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (data && data.plano_status !== 'pendente') {
-          setHasPlano(true);
-          setPlanoData(data);
-        }
-      } catch (error) {
-        console.error('Error checking plano:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkPlano();
+    fetchPlano();
   }, [user]);
 
   const handlePlanCreated = (data: any) => {
     setPlanoData(data);
     setHasPlano(true);
+    setIsEditing(false);
+  };
+
+  const handleDeletePlan = async () => {
+    if (!user || !planoData) return;
+
+    try {
+      const { error } = await supabase
+        .from('planos_estudo')
+        .delete()
+        .eq('id', planoData.id);
+
+      if (error) throw error;
+
+      // Update profile
+      await supabase
+        .from('profiles')
+        .update({ plano_criado: false })
+        .eq('id', user.id);
+
+      toast.success('Plano excluído com sucesso!');
+      setHasPlano(false);
+      setPlanoData(null);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      toast.error('Erro ao excluir o plano.');
+    }
+  };
+
+  const handleStartNewPlan = () => {
+    setIsEditing(true);
+    setHasPlano(false);
+  };
+
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
+  };
+
+  const handleCancelEdit = () => {
+    if (planoData) {
+      setHasPlano(true);
+      setIsEditing(false);
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   if (loading) {
@@ -68,10 +120,20 @@ export default function PlanoEstudo() {
       <div className="min-h-screen flex flex-col w-full relative">
         <Header />
         <main className="flex-1 container py-6 lg:py-8">
-          {hasPlano ? (
-            <PlanoEstudoDashboard planoData={planoData} onEdit={() => setHasPlano(false)} />
+          {hasPlano && !isEditing ? (
+            <PlanoEstudoDashboard 
+              planoData={planoData} 
+              onEdit={() => setIsEditing(true)}
+              onDelete={handleDeletePlan}
+              onNewPlan={handleStartNewPlan}
+              onBack={handleBackToDashboard}
+            />
           ) : (
-            <PlanoEstudoWizard onComplete={handlePlanCreated} />
+            <PlanoEstudoWizard 
+              onComplete={handlePlanCreated} 
+              onCancel={handleCancelEdit}
+              existingPlan={planoData}
+            />
           )}
         </main>
       </div>
