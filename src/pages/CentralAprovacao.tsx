@@ -161,24 +161,48 @@ const CentralAprovacao = () => {
     }
   }, [selectedAnalise]);
 
-  const handleGenerateAnalise = async () => {
-    if (!selectedBanca) return;
+  // Generate from banca selection only
+  const handleGenerateFromBanca = async () => {
+    if (!selectedBanca) {
+      toast.error('Selecione uma banca para gerar a análise');
+      return;
+    }
     
-    // Add user message
     const userMessage: ChatMessage = {
       id: 'user-' + Date.now(),
       role: 'user',
-      content: uploadedFile 
-        ? `Analise o documento "${uploadedFile.name}" para a banca ${selectedBanca}` 
-        : `Gere uma análise completa da banca ${selectedBanca}`,
+      content: `Gere uma análise completa da banca ${selectedBanca}`,
       timestamp: new Date()
     };
     setChatMessages([userMessage]);
     
-    if (uploadedFile) {
+    const analise = await createAnalise(selectedBanca);
+    if (analise) {
+      setSelectedAnalise(analise);
+    }
+  };
+
+  // Generate from uploaded document only
+  const handleGenerateFromDocument = async () => {
+    if (!uploadedFile) {
+      toast.error('Selecione um arquivo para gerar a análise');
+      return;
+    }
+    
+    const userMessage: ChatMessage = {
+      id: 'user-' + Date.now(),
+      role: 'user',
+      content: `Analise o documento "${uploadedFile.name}"`,
+      timestamp: new Date()
+    };
+    setChatMessages([userMessage]);
+    
+    try {
       const documentText = await parseDocument(uploadedFile);
-      if (documentText) {
-        const analise = await createAnaliseFromDocument(selectedBanca, documentText, uploadedFile.name);
+      if (documentText && documentText.length > 0) {
+        // Use "Documento" as banca when generating from document only
+        const bancaToUse = 'Documento Enviado';
+        const analise = await createAnaliseFromDocument(bancaToUse, documentText, uploadedFile.name);
         if (analise) {
           setSelectedAnalise(analise);
           setUploadedFile(null);
@@ -186,12 +210,14 @@ const CentralAprovacao = () => {
             fileInputRef.current.value = '';
           }
         }
+      } else {
+        toast.error('Não foi possível extrair texto do documento. Tente outro arquivo.');
+        setChatMessages([]);
       }
-    } else {
-      const analise = await createAnalise(selectedBanca);
-      if (analise) {
-        setSelectedAnalise(analise);
-      }
+    } catch (error) {
+      console.error('Erro ao processar documento:', error);
+      toast.error('Erro ao processar documento. Verifique o formato do arquivo.');
+      setChatMessages([]);
     }
   };
 
@@ -723,27 +749,72 @@ Responda como um especialista em concursos bancários, focando na Lei de Pareto 
                       Descubra padrões, estratégias e maximize sua aprovação!
                     </p>
 
-                    {/* New Analysis Form */}
-                    <div className="w-full max-w-md space-y-4 animate-fade-in" style={{ animationDelay: '200ms' }}>
-                      <Select value={selectedBanca} onValueChange={setSelectedBanca}>
-                        <SelectTrigger className="bg-muted/30 border-border/50 h-12">
-                          <SelectValue placeholder="Selecione a banca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BANCAS.map((banca) => (
-                            <SelectItem key={banca} value={banca}>
-                              {banca}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {/* New Analysis Form - Two Options */}
+                    <div className="w-full max-w-lg space-y-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                      
+                      {/* Option 1: Generate from Banca */}
+                      <div className="p-4 rounded-xl bg-muted/20 border border-border/50 space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center">
+                            <Target className="w-4 h-4 text-amber-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-sm">Opção 1: Por Banca</h3>
+                            <p className="text-xs text-muted-foreground">Análise baseada no perfil da banca</p>
+                          </div>
+                        </div>
+                        
+                        <Select value={selectedBanca} onValueChange={setSelectedBanca}>
+                          <SelectTrigger className="bg-background/50 border-border/50 h-11">
+                            <SelectValue placeholder="Selecione a banca" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BANCAS.map((banca) => (
+                              <SelectItem key={banca} value={banca}>
+                                {banca}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
 
-                      {/* Upload */}
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Upload className="w-3 h-3" />
-                          Anexar documento (opcional)
-                        </Label>
+                        <Button
+                          onClick={handleGenerateFromBanca}
+                          disabled={!selectedBanca || isGenerating || isUploading}
+                          className="w-full gap-2 h-11 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                        >
+                          {isGenerating && !uploadedFile ? (
+                            <>
+                              <Activity className="w-4 h-4 animate-spin" />
+                              Gerando Análise...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Gerar Análise da Banca
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 h-px bg-border/50" />
+                        <span className="text-xs text-muted-foreground font-medium px-2">OU</span>
+                        <div className="flex-1 h-px bg-border/50" />
+                      </div>
+
+                      {/* Option 2: Generate from Document */}
+                      <div className="p-4 rounded-xl bg-muted/20 border border-border/50 space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/10 flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-sm">Opção 2: Por Documento</h3>
+                            <p className="text-xs text-muted-foreground">Análise baseada no seu material</p>
+                          </div>
+                        </div>
+                        
                         <Input
                           ref={fileInputRef}
                           type="file"
@@ -752,14 +823,15 @@ Responda como um especialista em concursos bancários, focando na Lei de Pareto 
                           className="hidden"
                           id="file-upload"
                         />
+                        
                         {uploadedFile ? (
-                          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          <div className="flex items-center gap-2 p-3 bg-background/50 rounded-lg border border-blue-500/30">
+                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
                             <span className="text-sm truncate flex-1">{uploadedFile.name}</span>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6"
+                              className="h-6 w-6 hover:bg-destructive/20"
                               onClick={handleRemoveFile}
                             >
                               <X className="w-3 h-3" />
@@ -768,31 +840,32 @@ Responda como um especialista em concursos bancários, focando na Lei de Pareto 
                         ) : (
                           <label
                             htmlFor="file-upload"
-                            className="flex items-center gap-2 p-3 bg-muted/20 rounded-lg border border-dashed border-border/50 cursor-pointer hover:bg-muted/30 transition-colors"
+                            className="flex items-center justify-center gap-2 p-4 bg-background/30 rounded-lg border-2 border-dashed border-border/50 cursor-pointer hover:bg-background/50 hover:border-blue-500/30 transition-all duration-200"
                           >
-                            <FileUp className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">PDF, DOC, DOCX ou TXT</span>
+                            <FileUp className="w-5 h-5 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">PDF, DOC, DOCX ou TXT (máx. 10MB)</span>
                           </label>
                         )}
-                      </div>
 
-                      <Button
-                        onClick={handleGenerateAnalise}
-                        disabled={!selectedBanca || isGenerating || isUploading}
-                        className="w-full gap-2 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                      >
-                        {isGenerating || isUploading ? (
-                          <>
-                            <Activity className="w-4 h-4 animate-spin" />
-                            {isUploading ? 'Processando...' : 'Gerando Análise...'}
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-4 h-4" />
-                            {uploadedFile ? 'Analisar Documento' : 'Gerar Análise'}
-                          </>
-                        )}
-                      </Button>
+                        <Button
+                          onClick={handleGenerateFromDocument}
+                          disabled={!uploadedFile || isGenerating || isUploading}
+                          variant="outline"
+                          className="w-full gap-2 h-11 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/50"
+                        >
+                          {isUploading || (isGenerating && uploadedFile) ? (
+                            <>
+                              <Activity className="w-4 h-4 animate-spin" />
+                              {isUploading ? 'Processando Documento...' : 'Gerando Análise...'}
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              Analisar Documento
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (

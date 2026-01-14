@@ -130,18 +130,34 @@ Formate o relatório de forma clara e objetiva, com foco em ações práticas qu
   };
 
   const createAnaliseFromDocument = async (banca: string, documentText: string, fileName: string): Promise<BancaAnalise | null> => {
-    if (!user) return null;
+    if (!user) {
+      toast.error('Usuário não autenticado');
+      return null;
+    }
+    
+    if (!documentText || documentText.trim().length < 50) {
+      toast.error('Documento muito curto ou sem conteúdo legível');
+      return null;
+    }
     
     setIsGenerating(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData?.session?.access_token) {
+        throw new Error('Sessão não encontrada');
+      }
+      
+      const truncatedText = documentText.substring(0, 15000);
+      const isTruncated = documentText.length > 15000;
+      
       const response = await supabase.functions.invoke('ai-agent-chat', {
         body: {
-          message: `Analise o documento "${fileName}" enviado pelo aluno sobre a banca ${banca} e gere uma análise completa.
+          message: `Analise o documento "${fileName}" enviado pelo aluno e gere uma análise completa para concursos bancários.
 
 CONTEÚDO DO DOCUMENTO:
-${documentText.substring(0, 15000)}
-${documentText.length > 15000 ? '\n\n[... documento truncado por tamanho ...]' : ''}
+${truncatedText}
+${isTruncated ? '\n\n[... documento truncado por tamanho - continuando análise com o conteúdo disponível ...]' : ''}
 
 Com base no documento acima, realize uma análise completa incluindo:
 
@@ -149,15 +165,15 @@ Com base no documento acima, realize uma análise completa incluindo:
    - Principais pontos identificados no material
    - Questões ou temas abordados
    
-2. **Perfil da Banca ${banca}**
+2. **Análise de Conteúdo**
    - Padrões identificados no documento
-   - Disciplinas mais cobradas (aplicar Lei de Pareto 80/20)
-   - Estilo de questões observado
+   - Disciplinas abordadas (aplicar Lei de Pareto 80/20)
+   - Estilo de questões observado (se houver)
    
 3. **Pontos de Atenção**
    - Temas críticos encontrados
    - Áreas que precisam de mais estudo
-   - Armadilhas comuns identificadas
+   - Conceitos-chave identificados
    
 4. **Estratégias de Estudo**
    - Priorização baseada no documento
@@ -169,18 +185,25 @@ Com base no documento acima, realize uma análise completa incluindo:
    - Materiais complementares
    - Plano de ação imediato
 
-Formate o relatório de forma clara e objetiva, focando em ações práticas para aprovação.`,
-          action: 'analise_banca_documento',
-          context: { banca, fileName, hasDocument: true }
+Formate o relatório de forma clara e objetiva, focando em ações práticas para aprovação em concursos bancários.`,
+          action: 'analise_documento',
+          context: { fileName, hasDocument: true, documentLength: documentText.length }
         },
         headers: {
-          Authorization: `Bearer ${sessionData?.session?.access_token}`
+          Authorization: `Bearer ${sessionData.session.access_token}`
         }
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        console.error('Erro na resposta da função:', response.error);
+        throw new Error(response.error.message || 'Erro ao gerar análise');
+      }
 
-      const conteudo = response.data?.response || response.data?.message || 'Análise gerada com sucesso.';
+      const conteudo = response.data?.response || response.data?.message;
+      
+      if (!conteudo || conteudo.length < 100) {
+        throw new Error('Resposta da IA foi muito curta ou vazia');
+      }
       
       const palavras = conteudo.split(' ');
       const resumo = `📄 ${fileName} - ${palavras.slice(0, 40).join(' ')}${palavras.length > 40 ? '...' : ''}`;
@@ -189,8 +212,8 @@ Formate o relatório de forma clara e objetiva, focando em ações práticas par
         .from('analises_banca')
         .insert({
           user_id: user.id,
-          titulo: `Análise ${banca} - ${fileName}`,
-          banca,
+          titulo: `Análise - ${fileName}`,
+          banca: banca || 'Documento',
           conteudo,
           resumo,
           recomendacoes: null,
@@ -199,14 +222,18 @@ Formate o relatório de forma clara e objetiva, focando em ações práticas par
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao salvar análise:', error);
+        throw error;
+      }
       
       toast.success('Análise do documento gerada com sucesso!');
       await fetchAnalises();
       return data as BancaAnalise;
     } catch (error) {
       console.error('Erro ao criar análise do documento:', error);
-      toast.error('Erro ao gerar análise do documento. Tente novamente.');
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao gerar análise: ${errorMessage}`);
       return null;
     } finally {
       setIsGenerating(false);
