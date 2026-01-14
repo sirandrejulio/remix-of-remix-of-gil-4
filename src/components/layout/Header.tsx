@@ -21,6 +21,7 @@ export function Header() {
 
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
+    { label: "Plano de Estudo", path: "/plano-de-estudo" },
   ];
 
   const isHomePage = location.pathname === "/";

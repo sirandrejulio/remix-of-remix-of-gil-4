@@ -821,6 +821,57 @@ export type Database = {
           },
         ]
       }
+      planos_estudo: {
+        Row: {
+          alertas: Json | null
+          concurso: string
+          concurso_outro: string | null
+          created_at: string
+          data_prova: string | null
+          disponibilidade: Json
+          horas_semanais_total: number
+          id: string
+          meta_taxa_acerto: number | null
+          nivel_cargo: string
+          plano_gerado: Json | null
+          plano_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alertas?: Json | null
+          concurso: string
+          concurso_outro?: string | null
+          created_at?: string
+          data_prova?: string | null
+          disponibilidade?: Json
+          horas_semanais_total?: number
+          id?: string
+          meta_taxa_acerto?: number | null
+          nivel_cargo: string
+          plano_gerado?: Json | null
+          plano_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alertas?: Json | null
+          concurso?: string
+          concurso_outro?: string | null
+          created_at?: string
+          data_prova?: string | null
+          disponibilidade?: Json
+          horas_semanais_total?: number
+          id?: string
+          meta_taxa_acerto?: number | null
+          nivel_cargo?: string
+          plano_gerado?: Json | null
+          plano_status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -828,6 +879,7 @@ export type Database = {
           email: string
           id: string
           nome: string
+          plano_criado: boolean
           status: string
           telefone: string | null
           updated_at: string
@@ -838,6 +890,7 @@ export type Database = {
           email: string
           id: string
           nome: string
+          plano_criado?: boolean
           status?: string
           telefone?: string | null
           updated_at?: string
@@ -848,6 +901,7 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
+          plano_criado?: boolean
           status?: string
           telefone?: string | null
           updated_at?: string

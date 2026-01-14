@@ -19,6 +19,7 @@ import ResultadoSimulado from "./pages/ResultadoSimulado";
 import Questoes from "./pages/Questoes";
 import NovaQuestao from "./pages/NovaQuestao";
 import EspecialistaDeEstudos from "./pages/EspecialistaDeEstudos";
+import PlanoEstudo from "./pages/PlanoEstudo";
 
 // Admin pages
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -80,6 +81,11 @@ const App = () => (
             <Route path="/especialista-de-estudos" element={
               <ProtectedRoute>
                 <EspecialistaDeEstudos />
+              </ProtectedRoute>
+            } />
+            <Route path="/plano-de-estudo" element={
+              <ProtectedRoute>
+                <PlanoEstudo />
               </ProtectedRoute>
             } />
 
