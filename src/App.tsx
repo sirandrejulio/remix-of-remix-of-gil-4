@@ -20,6 +20,7 @@ import Questoes from "./pages/Questoes";
 import NovaQuestao from "./pages/NovaQuestao";
 import EspecialistaDeEstudos from "./pages/EspecialistaDeEstudos";
 import PlanoEstudo from "./pages/PlanoEstudo";
+import CentralAprovacao from "./pages/CentralAprovacao";
 
 // Admin pages
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -86,6 +87,11 @@ const App = () => (
             <Route path="/plano-de-estudo" element={
               <ProtectedRoute>
                 <PlanoEstudo />
+              </ProtectedRoute>
+            } />
+            <Route path="/central-aprovacao" element={
+              <ProtectedRoute>
+                <CentralAprovacao />
               </ProtectedRoute>
             } />
 

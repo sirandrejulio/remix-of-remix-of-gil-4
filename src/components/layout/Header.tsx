@@ -22,6 +22,7 @@ export function Header() {
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
     { label: "Plano de Estudo", path: "/plano-de-estudo" },
+    { label: "Central da Aprovação", path: "/central-aprovacao" },
   ];
 
   const isHomePage = location.pathname === "/";
