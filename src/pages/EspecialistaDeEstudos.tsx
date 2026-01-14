@@ -414,8 +414,8 @@ const EspecialistaDeEstudos = () => {
                   <div className="h-full min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
                     {/* Hero icon with enhanced glow */}
                     <div className="relative mb-8 animate-fade-in">
-                      <div className="w-28 h-28 rounded-3xl flex items-center justify-center">
-                        <img src={especialistaAvatar} alt="Especialista de Estudos" className="w-24 h-24 object-contain" />
+                      <div className="w-32 h-32 rounded-3xl flex items-center justify-center">
+                        <img src={especialistaAvatar} alt="Especialista de Estudos" className="w-28 h-28 object-contain" />
                       </div>
                       <div className="absolute inset-0 rounded-3xl bg-primary/10 blur-2xl animate-pulse" />
                       <div className="absolute -top-3 -right-3 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg animate-bounce">
