@@ -119,8 +119,32 @@ export default function AdminUsers() {
     }
   };
 
+  // Initial fetch
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Realtime subscription for profiles changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-users-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles'
+        },
+        () => {
+          // Refresh data when any profile changes
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Filtrar usuários
