@@ -29,8 +29,10 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
           .eq('id', user.id)
           .single();
 
-        setHasPlan(data?.plano_criado ?? false);
+        // Only redirect if plano_criado is explicitly false (first login)
+        setHasPlan(data?.plano_criado === true);
       } catch {
+        // On error, assume plan exists to avoid blocking user
         setHasPlan(true);
       } finally {
         setCheckingPlan(false);

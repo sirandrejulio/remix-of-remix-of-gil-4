@@ -46,10 +46,12 @@ export default function PlanoEstudo() {
     fetchPlano();
   }, [user]);
 
-  const handlePlanCreated = (data: any) => {
+  const handlePlanCreated = async (data: any) => {
     setPlanoData(data);
     setHasPlano(true);
     setIsEditing(false);
+    // Navigate to dashboard after creating plan for the first time
+    navigate('/dashboard');
   };
 
   const handleDeletePlan = async () => {
