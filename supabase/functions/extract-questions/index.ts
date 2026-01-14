@@ -275,11 +275,59 @@ function extractTemaFromBlock(block: string): { tema: string; subtema?: string }
 }
 
 /**
+ * Detecta se é questão CERTO/ERRADO (CESPE/CEBRASPE)
+ */
+function isCertoErradoQuestion(block: string): boolean {
+  const certoErradoPatterns = [
+    /\(\s*\)\s*CERTO/i,
+    /\(\s*\)\s*ERRADO/i,
+    /^\s*CERTO\s*$/mi,
+    /^\s*ERRADO\s*$/mi,
+    /Alternativas?:\s*\n\s*\(\s*\)\s*CERTO/i,
+    /Alternativas?:\s*\n\s*CERTO/i
+  ];
+  
+  for (const pattern of certoErradoPatterns) {
+    if (pattern.test(block)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Extrai gabarito CERTO/ERRADO
+ * Suporta formatos: E, E (ERRADO), E (Errado), ERRADO, C, C (CERTO), C (Certo), CERTO
+ */
+function extractCertoErradoGabarito(block: string): string {
+  // Padrão: GABARITO: E (ERRADO) ou GABARITO: E (Errado)
+  const fullMatch = block.match(/GABARITO:\s*([EC])\s*\([^)]+\)/i);
+  if (fullMatch) {
+    return fullMatch[1].toUpperCase() === 'E' ? 'B' : 'A'; // E=ERRADO->B, C=CERTO->A
+  }
+  
+  // Padrão: GABARITO: E ou GABARITO: C
+  const simpleMatch = block.match(/GABARITO:\s*([EC])\b/i);
+  if (simpleMatch) {
+    return simpleMatch[1].toUpperCase() === 'E' ? 'B' : 'A';
+  }
+  
+  // Padrão: GABARITO: ERRADO ou GABARITO: CERTO
+  const wordMatch = block.match(/GABARITO:\s*(CERTO|ERRADO)/i);
+  if (wordMatch) {
+    return wordMatch[1].toUpperCase() === 'ERRADO' ? 'B' : 'A';
+  }
+  
+  return '?';
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════
  * ESTRATÉGIA PRINCIPAL: Formato Estruturado
  * ═══════════════════════════════════════════════════════════════
  * 
- * PADRÃO 1 (Simples - sem BANCA/ANO):
+ * PADRÃO 1 (Simples - sem BANCA/ANO - 5 alternativas):
  *   QUESTÃO X
  *   TEMA: Cartões de Crédito / Crédito Rotativo
  *   Enunciado: texto da questão...
@@ -290,7 +338,7 @@ function extractTemaFromBlock(block: string): { tema: string; subtema?: string }
  *   GABARITO: B
  *   ---
  * 
- * PADRÃO 2 (Completo - com BANCA/ANO):
+ * PADRÃO 2 (Completo - com BANCA/ANO - 5 alternativas):
  *   QUESTÃO X
  *   BANCA: CESGRANRIO
  *   ANO: 2018
@@ -301,6 +349,30 @@ function extractTemaFromBlock(block: string): { tema: string; subtema?: string }
  *   (B) texto da alternativa B
  *   ...
  *   GABARITO: B
+ *   ---
+ * 
+ * PADRÃO 3 (CESPE/CEBRASPE - CERTO/ERRADO com parênteses):
+ *   QUESTÃO X
+ *   BANCA: CESPE
+ *   ANO: 2014
+ *   TEMA: Cartão de Crédito
+ *   Enunciado: O valor mínimo...
+ *   Alternativas:
+ *   ( ) CERTO
+ *   ( ) ERRADO
+ *   GABARITO: E (ERRADO)
+ *   ---
+ * 
+ * PADRÃO 4 (CESPE/CEBRASPE - CERTO/ERRADO simples):
+ *   QUESTÃO X
+ *   BANCA: CEBRASPE
+ *   ANO: 2018
+ *   TEMA: Protocolos / HTTPS
+ *   Enunciado: Em determinado computador...
+ *   Alternativas:
+ *   CERTO
+ *   ERRADO
+ *   GABARITO: E
  *   ---
  */
 function extractByStructuredFormat(text: string): any[] {
@@ -317,24 +389,27 @@ function extractByStructuredFormat(text: string): any[] {
     const numMatch = block.match(/QUEST[ÃA]O\s*(\d+)/i);
     const numero = numMatch ? parseInt(numMatch[1]) : undefined;
     
-    // PADRÃO 2: Extrai BANCA (opcional)
+    // Extrai BANCA (opcional, padrões 2, 3, 4)
     let banca = 'Não identificada';
     const bancaMatch = block.match(/BANCA:\s*([^\n]+)/i);
     if (bancaMatch) {
       banca = bancaMatch[1].trim();
     }
     
-    // PADRÃO 2: Extrai ANO (opcional)
+    // Extrai ANO (opcional, padrões 2, 3, 4)
     let ano: number | undefined;
     const anoMatch = block.match(/ANO:\s*(\d{4})/i);
     if (anoMatch) {
       ano = parseInt(anoMatch[1]);
     }
     
-    // AMBOS PADRÕES: Extrai TEMA (obrigatório)
+    // Detecta se é questão CERTO/ERRADO (CESPE/CEBRASPE)
+    const isCertoErrado = isCertoErradoQuestion(block);
+    
+    // Extrai TEMA (obrigatório)
     const { tema, subtema } = extractTemaFromBlock(block);
     
-    // AMBOS PADRÕES: Extrai Enunciado
+    // Extrai Enunciado
     const enunciadoMatch = block.match(/Enunciado:\s*([\s\S]*?)(?=Alternativas?:|$)/i);
     if (!enunciadoMatch) {
       console.log(`[StructuredFormat] Bloco sem "Enunciado:" - pulando`);
@@ -347,7 +422,7 @@ function extractByStructuredFormat(text: string): any[] {
       continue;
     }
     
-    // AMBOS PADRÕES: Extrai Alternativas
+    // Extrai Alternativas
     const alternativasMatch = block.match(/Alternativas?:\s*([\s\S]*?)(?=GABARITO:|Resposta:|$)/i);
     if (!alternativasMatch) {
       console.log(`[StructuredFormat] Bloco sem "Alternativas:" - pulando`);
@@ -356,52 +431,77 @@ function extractByStructuredFormat(text: string): any[] {
     
     const altsText = alternativasMatch[1];
     const alts: Record<string, string> = {};
+    let tipoQuestao = 'multipla_escolha';
     
-    // PADRÃO 2: "(A) texto" - com parênteses
-    const altPatternParen = /\(([A-E])\)\s*([^\n]+)/gi;
-    let match;
-    while ((match = altPatternParen.exec(altsText)) !== null) {
-      const letter = match[1].toUpperCase();
-      if (!alts[letter]) {
-        alts[letter] = match[2].trim().replace(/\.$/, '');
+    // PADRÕES 3 e 4: CERTO/ERRADO (CESPE/CEBRASPE)
+    if (isCertoErrado) {
+      tipoQuestao = 'certo_errado';
+      alts['A'] = 'CERTO';
+      alts['B'] = 'ERRADO';
+    } else {
+      // PADRÃO 2: "(A) texto" - com parênteses
+      const altPatternParen = /\(([A-E])\)\s*([^\n]+)/gi;
+      let match;
+      while ((match = altPatternParen.exec(altsText)) !== null) {
+        const letter = match[1].toUpperCase();
+        if (!alts[letter]) {
+          alts[letter] = match[2].trim().replace(/\.$/, '');
+        }
       }
-    }
-    
-    // PADRÃO 1: "A texto" - sem parênteses (apenas letra + espaço)
-    if (Object.keys(alts).length < 3) {
-      const lines = altsText.split('\n');
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        // Match: "A texto" ou "A) texto" ou "A. texto"
-        const simpleMatch = trimmedLine.match(/^([A-E])[\s\)\.]+(.+)$/i);
-        if (simpleMatch) {
-          const letter = simpleMatch[1].toUpperCase();
-          if (!alts[letter]) {
-            let altText = simpleMatch[2].trim().replace(/\.$/, '');
-            if (altText.length > 0) {
-              alts[letter] = altText;
+      
+      // PADRÃO 1: "A texto" - sem parênteses (apenas letra + espaço)
+      if (Object.keys(alts).length < 3) {
+        const lines = altsText.split('\n');
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          // Match: "A texto" ou "A) texto" ou "A. texto"
+          const simpleMatch = trimmedLine.match(/^([A-E])[\s\)\.]+(.+)$/i);
+          if (simpleMatch) {
+            const letter = simpleMatch[1].toUpperCase();
+            if (!alts[letter]) {
+              let altText = simpleMatch[2].trim().replace(/\.$/, '');
+              if (altText.length > 0) {
+                alts[letter] = altText;
+              }
             }
           }
         }
       }
     }
     
-    if (Object.keys(alts).length < 3) {
-      console.log(`[StructuredFormat] Apenas ${Object.keys(alts).length} alternativas encontradas - pulando`);
+    // Validação de alternativas mínimas
+    const minAlts = tipoQuestao === 'certo_errado' ? 2 : 3;
+    if (Object.keys(alts).length < minAlts) {
+      console.log(`[StructuredFormat] Apenas ${Object.keys(alts).length} alternativas encontradas (mínimo ${minAlts}) - pulando`);
       continue;
     }
     
-    // AMBOS PADRÕES: Extrai GABARITO
+    // Extrai GABARITO baseado no tipo de questão
     let resposta = '?';
-    const gabaritoMatch = block.match(/GABARITO:\s*([A-E])/i);
-    if (gabaritoMatch) {
-      resposta = gabaritoMatch[1].toUpperCase();
+    
+    if (tipoQuestao === 'certo_errado') {
+      resposta = extractCertoErradoGabarito(block);
+    } else {
+      const gabaritoMatch = block.match(/GABARITO:\s*([A-E])/i);
+      if (gabaritoMatch) {
+        resposta = gabaritoMatch[1].toUpperCase();
+      }
     }
     
     // Detecta qual padrão foi usado
-    const formato = (bancaMatch || anoMatch) ? 'padrao2' : 'padrao1';
+    let formato = 'padrao1';
+    if (tipoQuestao === 'certo_errado') {
+      // Padrão 3: com parênteses ( ) CERTO
+      if (/\(\s*\)\s*CERTO/i.test(block)) {
+        formato = 'padrao3';
+      } else {
+        formato = 'padrao4';
+      }
+    } else if (bancaMatch || anoMatch) {
+      formato = 'padrao2';
+    }
     
-    console.log(`[StructuredFormat] ✓ Q${numero || '?'}: tema="${tema}", banca="${banca}", ano=${ano || 'N/A'}, formato=${formato}, gabarito=${resposta}`);
+    console.log(`[StructuredFormat] ✓ Q${numero || '?'}: tema="${tema}", banca="${banca}", ano=${ano || 'N/A'}, formato=${formato}, tipo=${tipoQuestao}, gabarito=${resposta}`);
     
     questions.push({
       enunciado,
@@ -416,7 +516,8 @@ function extractByStructuredFormat(text: string): any[] {
       banca,
       ano_referencia: ano,
       numero,
-      formato
+      formato,
+      tipo_questao: tipoQuestao
     });
   }
   

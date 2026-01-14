@@ -3,7 +3,7 @@
  * Sistema Bancário Ágil - Upload de Questões
  * 
  * ═══════════════════════════════════════════════════════════════
- * PADRÃO 1 (Simples - sem BANCA/ANO):
+ * PADRÃO 1 (Simples - sem BANCA/ANO - 5 alternativas A-E):
  * ═══════════════════════════════════════════════════════════════
  * QUESTÃO X
  * TEMA: Cartões de Crédito / Crédito Rotativo
@@ -18,7 +18,7 @@
  * ---
  * 
  * ═══════════════════════════════════════════════════════════════
- * PADRÃO 2 (Completo - com BANCA/ANO):
+ * PADRÃO 2 (Completo - com BANCA/ANO - 5 alternativas A-E):
  * ═══════════════════════════════════════════════════════════════
  * QUESTÃO X
  * BANCA: CESGRANRIO
@@ -34,12 +34,41 @@
  * GABARITO: B
  * ---
  * 
- * Ambos os padrões são automaticamente detectados e parseados.
+ * ═══════════════════════════════════════════════════════════════
+ * PADRÃO 3 (CESPE/CEBRASPE - CERTO/ERRADO com parênteses):
+ * ═══════════════════════════════════════════════════════════════
+ * QUESTÃO X
+ * BANCA: CESPE
+ * ANO: 2014
+ * TEMA: Cartão de Crédito
+ * Enunciado: O valor mínimo da fatura...
+ * Alternativas:
+ * ( ) CERTO
+ * ( ) ERRADO
+ * GABARITO: E (ERRADO)
+ * ---
+ * 
+ * ═══════════════════════════════════════════════════════════════
+ * PADRÃO 4 (CESPE/CEBRASPE - CERTO/ERRADO simples):
+ * ═══════════════════════════════════════════════════════════════
+ * QUESTÃO X
+ * BANCA: CEBRASPE
+ * ANO: 2018
+ * TEMA: Protocolos / HTTPS
+ * Enunciado: Em determinado computador...
+ * Alternativas:
+ * CERTO
+ * ERRADO
+ * GABARITO: E
+ * ---
+ * 
+ * Todos os padrões são automaticamente detectados e parseados.
  * O separador "---" entre questões é opcional mas recomendado.
  */
 
-export type QuestionFormat = 'padrao1' | 'padrao2' | 'desconhecido';
+export type QuestionFormat = 'padrao1' | 'padrao2' | 'padrao3' | 'padrao4' | 'desconhecido';
 export type ConfidenceLevel = 'alto' | 'medio' | 'baixo';
+export type QuestionType = 'multipla_escolha' | 'certo_errado';
 
 export interface ParsedQuestion {
   numero?: number;
@@ -56,6 +85,7 @@ export interface ParsedQuestion {
   resposta_correta: string;
   confidence: ConfidenceLevel;
   format: QuestionFormat;
+  tipo_questao: QuestionType;
 }
 
 export interface ParseResult {
@@ -66,9 +96,37 @@ export interface ParseResult {
     total: number;
     padrao1: number;
     padrao2: number;
+    padrao3: number;
+    padrao4: number;
     comGabarito: number;
     semGabarito: number;
   };
+}
+
+/**
+ * Detecta se é questão CERTO/ERRADO (CESPE/CEBRASPE)
+ */
+function isCertoErradoQuestion(block: string): boolean {
+  const certoErradoPatterns = [
+    /\(\s*\)\s*CERTO/i,
+    /\(\s*\)\s*ERRADO/i,
+    /\(\s*\)\s*Certo/i,
+    /\(\s*\)\s*Errado/i,
+    /^\s*CERTO\s*$/mi,
+    /^\s*ERRADO\s*$/mi,
+    /^\s*Certo\s*$/mi,
+    /^\s*Errado\s*$/mi,
+    /Alternativas?:\s*\n\s*\(\s*\)\s*CERTO/i,
+    /Alternativas?:\s*\n\s*CERTO/i
+  ];
+  
+  for (const pattern of certoErradoPatterns) {
+    if (pattern.test(block)) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 /**
@@ -80,13 +138,24 @@ function detectBlockFormat(block: string): QuestionFormat {
   const hasTema = /TEMA:\s*[^\n]+/i.test(block);
   const hasEnunciado = /Enunciado:\s*/i.test(block);
   const hasAlternativas = /Alternativas?:/i.test(block);
+  const isCertoErrado = isCertoErradoQuestion(block);
   
-  // Padrão 2: tem BANCA e ANO explícitos
+  // Padrões 3 e 4: CESPE/CEBRASPE - Certo/Errado
+  if (isCertoErrado && hasBanca && hasAno) {
+    // Padrão 3: com parênteses ( ) CERTO / ( ) ERRADO
+    if (/\(\s*\)\s*CERTO/i.test(block) || /\(\s*\)\s*Certo/i.test(block)) {
+      return 'padrao3';
+    }
+    // Padrão 4: sem parênteses, apenas CERTO / ERRADO
+    return 'padrao4';
+  }
+  
+  // Padrão 2: tem BANCA e ANO explícitos (5 alternativas)
   if (hasBanca && hasAno && hasTema) {
     return 'padrao2';
   }
   
-  // Padrão 1: tem TEMA mas sem BANCA/ANO
+  // Padrão 1: tem TEMA mas sem BANCA/ANO (5 alternativas)
   if (hasTema && hasEnunciado && hasAlternativas) {
     return 'padrao1';
   }
@@ -145,7 +214,64 @@ function extractTema(block: string): { tema: string; subtema?: string } {
  *   a) texto da alternativa
  *   b) texto da alternativa
  */
-function extractAlternatives(altsText: string): Record<string, string> {
+/**
+ * Extrai alternativas CERTO/ERRADO (CESPE/CEBRASPE)
+ * Retorna alternativas mapeadas como A=CERTO, B=ERRADO
+ */
+function extractCertoErradoAlternatives(altsText: string): { alts: Record<string, string>; tipo: 'certo_errado' } {
+  const alts: Record<string, string> = {};
+  
+  // Padrão 3: ( ) CERTO / ( ) ERRADO
+  if (/\(\s*\)\s*CERTO/i.test(altsText) || /\(\s*\)\s*Certo/i.test(altsText)) {
+    alts['A'] = 'CERTO';
+    alts['B'] = 'ERRADO';
+    return { alts, tipo: 'certo_errado' };
+  }
+  
+  // Padrão 4: Apenas CERTO / ERRADO (um por linha)
+  const lines = altsText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  for (const line of lines) {
+    if (/^CERTO$/i.test(line) || /^Certo$/i.test(line)) {
+      alts['A'] = 'CERTO';
+    }
+    if (/^ERRADO$/i.test(line) || /^Errado$/i.test(line)) {
+      alts['B'] = 'ERRADO';
+    }
+  }
+  
+  if (alts['A'] && alts['B']) {
+    return { alts, tipo: 'certo_errado' };
+  }
+  
+  // Fallback se não encontrou padrão claro
+  alts['A'] = 'CERTO';
+  alts['B'] = 'ERRADO';
+  return { alts, tipo: 'certo_errado' };
+}
+
+/**
+ * Extrai alternativas de um bloco de texto
+ * Suporta múltiplos formatos:
+ * 
+ * PADRÃO 1 (Simples): 
+ *   A texto da alternativa
+ *   B texto da alternativa
+ * 
+ * PADRÃO 2 (Com parênteses):
+ *   (A) texto da alternativa
+ *   (B) texto da alternativa
+ * 
+ * PADRÃO 3/4 (CERTO/ERRADO):
+ *   ( ) CERTO / ( ) ERRADO
+ *   CERTO / ERRADO
+ */
+function extractAlternatives(altsText: string, format: QuestionFormat): { alts: Record<string, string>; tipo: QuestionType } {
+  // Para padrões 3 e 4 (CESPE/CEBRASPE), usa extração específica
+  if (format === 'padrao3' || format === 'padrao4') {
+    return extractCertoErradoAlternatives(altsText);
+  }
+  
   const alts: Record<string, string> = {};
   let match;
   
@@ -181,7 +307,7 @@ function extractAlternatives(altsText: string): Record<string, string> {
     }
   }
   
-  // PADRÃO 3: Alternativas inline (backup para formatos não-padrão)
+  // Alternativas inline (backup para formatos não-padrão)
   if (Object.keys(alts).length < 3) {
     const inlinePattern = /(?:^|\s)([A-E])\s+([^A-E\n]{5,}?)(?=\s+[A-E]\s+|$)/gi;
     while ((match = inlinePattern.exec(altsText)) !== null) {
@@ -192,7 +318,33 @@ function extractAlternatives(altsText: string): Record<string, string> {
     }
   }
   
-  return alts;
+  return { alts, tipo: 'multipla_escolha' };
+}
+
+/**
+ * Extrai gabarito CERTO/ERRADO
+ * Suporta formatos: E, E (ERRADO), E (Errado), ERRADO, C, C (CERTO), C (Certo), CERTO
+ */
+function extractCertoErradoGabarito(block: string): string {
+  // Padrão: GABARITO: E (ERRADO) ou GABARITO: E (Errado)
+  const fullMatch = block.match(/GABARITO:\s*([EC])\s*\([^)]+\)/i);
+  if (fullMatch) {
+    return fullMatch[1].toUpperCase() === 'E' ? 'B' : 'A'; // E=ERRADO->B, C=CERTO->A
+  }
+  
+  // Padrão: GABARITO: E ou GABARITO: C
+  const simpleMatch = block.match(/GABARITO:\s*([EC])\b/i);
+  if (simpleMatch) {
+    return simpleMatch[1].toUpperCase() === 'E' ? 'B' : 'A';
+  }
+  
+  // Padrão: GABARITO: ERRADO ou GABARITO: CERTO
+  const wordMatch = block.match(/GABARITO:\s*(CERTO|ERRADO)/i);
+  if (wordMatch) {
+    return wordMatch[1].toUpperCase() === 'ERRADO' ? 'B' : 'A';
+  }
+  
+  return '?';
 }
 
 /**
@@ -209,11 +361,11 @@ function parseQuestionBlock(block: string): ParsedQuestion | null {
   const numMatch = block.match(/QUEST[ÃA]O\s*(\d+)/i);
   const numero = numMatch ? parseInt(numMatch[1]) : undefined;
   
-  // Extrai BANCA (Padrão 2)
+  // Extrai BANCA (Padrões 2, 3, 4)
   const bancaMatch = block.match(/BANCA:\s*([^\n]+)/i);
   const banca = bancaMatch ? bancaMatch[1].trim() : undefined;
   
-  // Extrai ANO (Padrão 2)
+  // Extrai ANO (Padrões 2, 3, 4)
   const anoMatch = block.match(/ANO:\s*(\d{4})/i);
   const ano_referencia = anoMatch ? parseInt(anoMatch[1]) : undefined;
   
@@ -252,22 +404,30 @@ function parseQuestionBlock(block: string): ParsedQuestion | null {
     }
   }
   
-  const alts = extractAlternatives(altsText);
+  // Extrai alternativas baseado no formato
+  const { alts, tipo: tipo_questao } = extractAlternatives(altsText, format);
   
-  if (Object.keys(alts).length < 3) {
+  // Validação: para múltipla escolha precisa de 3+ alternativas, para C/E apenas 2
+  const minAlts = tipo_questao === 'certo_errado' ? 2 : 3;
+  if (Object.keys(alts).length < minAlts) {
     return null;
   }
   
-  // Extrai GABARITO
+  // Extrai GABARITO baseado no tipo de questão
   let resposta = '?';
-  const gabaritoMatch = block.match(/GABARITO:\s*([A-E])/i);
-  if (gabaritoMatch) {
-    resposta = gabaritoMatch[1].toUpperCase();
+  
+  if (tipo_questao === 'certo_errado') {
+    resposta = extractCertoErradoGabarito(block);
   } else {
-    // Tenta outros padrões
-    const respostaMatch = block.match(/Resposta(?:\s*correta)?:\s*([A-E])/i);
-    if (respostaMatch) {
-      resposta = respostaMatch[1].toUpperCase();
+    const gabaritoMatch = block.match(/GABARITO:\s*([A-E])/i);
+    if (gabaritoMatch) {
+      resposta = gabaritoMatch[1].toUpperCase();
+    } else {
+      // Tenta outros padrões
+      const respostaMatch = block.match(/Resposta(?:\s*correta)?:\s*([A-E])/i);
+      if (respostaMatch) {
+        resposta = respostaMatch[1].toUpperCase();
+      }
     }
   }
   
@@ -276,7 +436,9 @@ function parseQuestionBlock(block: string): ParsedQuestion | null {
   
   if (resposta === '?') {
     confidence = 'baixo';
-  } else if (Object.keys(alts).length < 5 || !tema || tema === 'Geral') {
+  } else if (tipo_questao === 'multipla_escolha' && Object.keys(alts).length < 5) {
+    confidence = 'medio';
+  } else if (!tema || tema === 'Geral') {
     confidence = 'medio';
   }
   
@@ -294,7 +456,8 @@ function parseQuestionBlock(block: string): ParsedQuestion | null {
     alternativa_e: alts['E'] || '',
     resposta_correta: resposta,
     confidence,
-    format
+    format,
+    tipo_questao
   };
 }
 
@@ -343,6 +506,8 @@ export function parseQuestions(text: string): ParseResult {
   
   let padrao1Count = 0;
   let padrao2Count = 0;
+  let padrao3Count = 0;
+  let padrao4Count = 0;
   let comGabarito = 0;
   let semGabarito = 0;
   
@@ -357,10 +522,12 @@ export function parseQuestions(text: string): ParseResult {
         
         if (question.format === 'padrao1') padrao1Count++;
         if (question.format === 'padrao2') padrao2Count++;
+        if (question.format === 'padrao3') padrao3Count++;
+        if (question.format === 'padrao4') padrao4Count++;
         if (question.resposta_correta !== '?') comGabarito++;
         else semGabarito++;
         
-        console.log(`[QuestionParser] Parsed Q${question.numero || i + 1}: tema="${question.tema}", format=${question.format}`);
+        console.log(`[QuestionParser] Parsed Q${question.numero || i + 1}: tema="${question.tema}", format=${question.format}, tipo=${question.tipo_questao}`);
       } else {
         if (block.length > 100) {
           errors.push(`Bloco ${i + 1}: Não foi possível extrair questão válida`);
@@ -379,6 +546,8 @@ export function parseQuestions(text: string): ParseResult {
       total: questions.length,
       padrao1: padrao1Count,
       padrao2: padrao2Count,
+      padrao3: padrao3Count,
+      padrao4: padrao4Count,
       comGabarito,
       semGabarito
     }
